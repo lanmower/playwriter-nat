@@ -223,6 +223,138 @@ class CoolifyAPIClient {
       updated_at: app.updated_at
     };
   }
+
+  async listGitHubApps() {
+    if (!this.apiToken) {
+      throw new Error('API token not set. Use set_api_token tool first.');
+    }
+
+    const response = await this.makeRequest('GET', '/api/v1/github-apps');
+
+    if (response.status === 401) {
+      throw new Error('Unauthorized: Invalid API token');
+    }
+
+    if (response.status !== 200) {
+      throw new Error(`API error: ${response.status} - ${response.text}`);
+    }
+
+    return response.body || [];
+  }
+
+  async getGitHubRepositories(gitHubAppUuid) {
+    if (!this.apiToken) {
+      throw new Error('API token not set. Use set_api_token tool first.');
+    }
+
+    const response = await this.makeRequest('GET', `/api/v1/github-apps/${gitHubAppUuid}/repositories`);
+
+    if (response.status === 401) {
+      throw new Error('Unauthorized: Invalid API token');
+    }
+
+    if (response.status !== 200) {
+      throw new Error(`API error: ${response.status} - ${response.text}`);
+    }
+
+    return response.body?.repositories || [];
+  }
+
+  async createApplicationGitHub(params) {
+    if (!this.apiToken) {
+      throw new Error('API token not set. Use set_api_token tool first.');
+    }
+
+    const body = {
+      project_uuid: params.project_uuid,
+      server_uuid: params.server_uuid,
+      github_app_uuid: params.github_app_uuid,
+      git_repository: params.git_repository,
+      git_branch: params.git_branch,
+      build_pack: params.build_pack || 'nixpacks',
+      ports_exposes: params.ports_exposes
+    };
+
+    if (params.environment_name) body.environment_name = params.environment_name;
+    if (params.environment_uuid) body.environment = params.environment_uuid;
+    if (params.name) body.name = params.name;
+    if (params.description) body.description = params.description;
+    if (params.domains) body.domains = params.domains;
+    if (params.instant_deploy !== undefined) body.instant_deploy = params.instant_deploy;
+    if (params.base_directory) body.base_directory = params.base_directory;
+    if (params.build_command) body.build_command = params.build_command;
+    if (params.start_command) body.start_command = params.start_command;
+    if (params.ports_mappings) body.ports_mappings = params.ports_mappings;
+
+    const response = await this.makeRequest('POST', '/api/v1/applications/private-github-app', body);
+
+    if (response.status === 401) {
+      throw new Error('Unauthorized: Invalid API token');
+    }
+
+    if (response.status !== 201 && response.status !== 200) {
+      throw new Error(`API error: ${response.status} - ${response.text}`);
+    }
+
+    return response.body;
+  }
+
+  async createEnvVariable(appUuid, key, value, options = {}) {
+    if (!this.apiToken) {
+      throw new Error('API token not set. Use set_api_token tool first.');
+    }
+
+    const body = {
+      key,
+      value,
+      is_buildtime: options.is_buildtime !== undefined ? options.is_buildtime : true,
+      is_runtime: options.is_runtime !== undefined ? options.is_runtime : true
+    };
+
+    if (options.is_preview !== undefined) body.is_preview = options.is_preview;
+    if (options.is_literal !== undefined) body.is_literal = options.is_literal;
+    if (options.is_multiline !== undefined) body.is_multiline = options.is_multiline;
+
+    const response = await this.makeRequest('POST', `/api/v1/applications/${appUuid}/envs`, body);
+
+    if (response.status === 401) {
+      throw new Error('Unauthorized: Invalid API token');
+    }
+
+    if (response.status !== 201 && response.status !== 200) {
+      throw new Error(`API error: ${response.status} - ${response.text}`);
+    }
+
+    return response.body;
+  }
+
+  async redeployApplication(appUuid, force = false, instantDeploy = false) {
+    if (!this.apiToken) {
+      throw new Error('API token not set. Use set_api_token tool first.');
+    }
+
+    let endpoint = `/api/v1/applications/${appUuid}/start`;
+    const params = [];
+
+    if (force) params.push('force=true');
+    if (instantDeploy) params.push('instant_deploy=true');
+
+    if (params.length > 0) {
+      endpoint += '?' + params.join('&');
+    }
+
+    const response = await this.makeRequest('GET', endpoint);
+
+    if (response.status === 401) {
+      throw new Error('Unauthorized: Invalid API token');
+    }
+
+    if (response.status !== 200) {
+      throw new Error(`API error: ${response.status} - ${response.text}`);
+    }
+
+    return response.body;
+  }
 }
 
 const apiClient = new CoolifyAPIClient();
@@ -340,6 +472,159 @@ const tools = [
     }
   },
   {
+    name: 'list_github_apps',
+    description: 'List installed GitHub apps',
+    inputSchema: {
+      type: 'object',
+      properties: {},
+      required: []
+    }
+  },
+  {
+    name: 'get_github_repositories',
+    description: 'List repos from GitHub app',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        github_app_uuid: {
+          type: 'string',
+          description: 'GitHub app UUID'
+        }
+      },
+      required: ['github_app_uuid']
+    }
+  },
+  {
+    name: 'create_application_github',
+    description: 'Deploy app from GitHub repo',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        project_uuid: {
+          type: 'string',
+          description: 'Project UUID'
+        },
+        server_uuid: {
+          type: 'string',
+          description: 'Server UUID'
+        },
+        github_app_uuid: {
+          type: 'string',
+          description: 'GitHub app UUID'
+        },
+        git_repository: {
+          type: 'string',
+          description: 'Repo (owner/repo)'
+        },
+        git_branch: {
+          type: 'string',
+          description: 'Branch name'
+        },
+        ports_exposes: {
+          type: 'string',
+          description: 'Port to expose'
+        },
+        environment_name: {
+          type: 'string',
+          description: 'Environment name'
+        },
+        environment_uuid: {
+          type: 'string',
+          description: 'Environment UUID'
+        },
+        name: {
+          type: 'string',
+          description: 'App name'
+        },
+        description: {
+          type: 'string',
+          description: 'App description'
+        },
+        build_pack: {
+          type: 'string',
+          description: 'Build pack (nixpacks, dockerfile, etc)'
+        },
+        instant_deploy: {
+          type: 'boolean',
+          description: 'Deploy immediately'
+        },
+        base_directory: {
+          type: 'string',
+          description: 'Base directory'
+        },
+        build_command: {
+          type: 'string',
+          description: 'Build command'
+        },
+        start_command: {
+          type: 'string',
+          description: 'Start command'
+        }
+      },
+      required: ['project_uuid', 'server_uuid', 'github_app_uuid', 'git_repository', 'git_branch', 'ports_exposes']
+    }
+  },
+  {
+    name: 'create_env_variable',
+    description: 'Add env variable to app',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        app_uuid: {
+          type: 'string',
+          description: 'App UUID'
+        },
+        key: {
+          type: 'string',
+          description: 'Variable name'
+        },
+        value: {
+          type: 'string',
+          description: 'Variable value'
+        },
+        is_buildtime: {
+          type: 'boolean',
+          description: 'Build-time variable'
+        },
+        is_runtime: {
+          type: 'boolean',
+          description: 'Runtime variable'
+        },
+        is_preview: {
+          type: 'boolean',
+          description: 'Preview environment only'
+        },
+        is_literal: {
+          type: 'boolean',
+          description: 'Don\'t interpolate'
+        }
+      },
+      required: ['app_uuid', 'key', 'value']
+    }
+  },
+  {
+    name: 'redeploy_application',
+    description: 'Redeploy app',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        app_uuid: {
+          type: 'string',
+          description: 'App UUID'
+        },
+        force: {
+          type: 'boolean',
+          description: 'Force rebuild'
+        },
+        instant_deploy: {
+          type: 'boolean',
+          description: 'Skip queue'
+        }
+      },
+      required: ['app_uuid']
+    }
+  },
+  {
     name: 'set_api_token',
     description: 'Set Coolify API token',
     inputSchema: {
@@ -388,6 +673,31 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
       case 'get_app_status':
         result = await apiClient.getAppStatus(args.app_uuid);
+        break;
+
+      case 'list_github_apps':
+        result = await apiClient.listGitHubApps();
+        break;
+
+      case 'get_github_repositories':
+        result = await apiClient.getGitHubRepositories(args.github_app_uuid);
+        break;
+
+      case 'create_application_github':
+        result = await apiClient.createApplicationGitHub(args);
+        break;
+
+      case 'create_env_variable':
+        result = await apiClient.createEnvVariable(args.app_uuid, args.key, args.value, {
+          is_buildtime: args.is_buildtime,
+          is_runtime: args.is_runtime,
+          is_preview: args.is_preview,
+          is_literal: args.is_literal
+        });
+        break;
+
+      case 'redeploy_application':
+        result = await apiClient.redeployApplication(args.app_uuid, args.force || false, args.instant_deploy || false);
         break;
 
       case 'set_api_token':
