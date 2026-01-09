@@ -257,6 +257,24 @@ class CoolifyAPIClient {
     return response.body;
   }
 
+  async listEnvVariables(appUuid) {
+    if (!this.apiToken) {
+      throw new Error('API token not set. Use set_api_token tool first.');
+    }
+
+    const response = await this.makeRequest('GET', `/api/v1/applications/${appUuid}/envs`);
+
+    if (response.status === 401) {
+      throw new Error('Unauthorized: Invalid API token');
+    }
+
+    if (response.status !== 200) {
+      throw new Error(`API error: ${response.status} - ${response.text}`);
+    }
+
+    return response.body || [];
+  }
+
   async createEnvVariable(appUuid, key, value, options = {}) {
     if (!this.apiToken) {
       throw new Error('API token not set. Use set_api_token tool first.');
@@ -284,6 +302,52 @@ class CoolifyAPIClient {
     }
 
     return response.body;
+  }
+
+  async updateEnvVariable(appUuid, envUuid, updates = {}) {
+    if (!this.apiToken) {
+      throw new Error('API token not set. Use set_api_token tool first.');
+    }
+
+    const body = {};
+
+    if (updates.key !== undefined) body.key = updates.key;
+    if (updates.value !== undefined) body.value = updates.value;
+    if (updates.is_buildtime !== undefined) body.is_buildtime = updates.is_buildtime;
+    if (updates.is_runtime !== undefined) body.is_runtime = updates.is_runtime;
+    if (updates.is_preview !== undefined) body.is_preview = updates.is_preview;
+    if (updates.is_literal !== undefined) body.is_literal = updates.is_literal;
+    if (updates.is_multiline !== undefined) body.is_multiline = updates.is_multiline;
+
+    const response = await this.makeRequest('PATCH', `/api/v1/applications/${appUuid}/envs/${envUuid}`, body);
+
+    if (response.status === 401) {
+      throw new Error('Unauthorized: Invalid API token');
+    }
+
+    if (response.status !== 200) {
+      throw new Error(`API error: ${response.status} - ${response.text}`);
+    }
+
+    return response.body;
+  }
+
+  async deleteEnvVariable(appUuid, envUuid) {
+    if (!this.apiToken) {
+      throw new Error('API token not set. Use set_api_token tool first.');
+    }
+
+    const response = await this.makeRequest('DELETE', `/api/v1/applications/${appUuid}/envs/${envUuid}`);
+
+    if (response.status === 401) {
+      throw new Error('Unauthorized: Invalid API token');
+    }
+
+    if (response.status !== 200 && response.status !== 204) {
+      throw new Error(`API error: ${response.status} - ${response.text}`);
+    }
+
+    return { success: true, message: 'Environment variable deleted' };
   }
 
   async redeployApplication(appUuid, force = false, instantDeploy = false) {
@@ -482,6 +546,20 @@ const tools = [
     }
   },
   {
+    name: 'list_env_variables',
+    description: 'List app environment variables',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        app_uuid: {
+          type: 'string',
+          description: 'App UUID'
+        }
+      },
+      required: ['app_uuid']
+    }
+  },
+  {
     name: 'create_env_variable',
     description: 'Add env variable to app',
     inputSchema: {
@@ -509,7 +587,7 @@ const tools = [
         },
         is_preview: {
           type: 'boolean',
-          description: 'Preview environment only'
+          description: 'Preview only'
         },
         is_literal: {
           type: 'boolean',
@@ -517,6 +595,66 @@ const tools = [
         }
       },
       required: ['app_uuid', 'key', 'value']
+    }
+  },
+  {
+    name: 'update_env_variable',
+    description: 'Edit app environment variable',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        app_uuid: {
+          type: 'string',
+          description: 'App UUID'
+        },
+        env_uuid: {
+          type: 'string',
+          description: 'Env var UUID'
+        },
+        key: {
+          type: 'string',
+          description: 'Variable name'
+        },
+        value: {
+          type: 'string',
+          description: 'Variable value'
+        },
+        is_buildtime: {
+          type: 'boolean',
+          description: 'Build-time variable'
+        },
+        is_runtime: {
+          type: 'boolean',
+          description: 'Runtime variable'
+        },
+        is_preview: {
+          type: 'boolean',
+          description: 'Preview only'
+        },
+        is_literal: {
+          type: 'boolean',
+          description: 'Don\'t interpolate'
+        }
+      },
+      required: ['app_uuid', 'env_uuid']
+    }
+  },
+  {
+    name: 'delete_env_variable',
+    description: 'Delete app environment variable',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        app_uuid: {
+          type: 'string',
+          description: 'App UUID'
+        },
+        env_uuid: {
+          type: 'string',
+          description: 'Env var UUID'
+        }
+      },
+      required: ['app_uuid', 'env_uuid']
     }
   },
   {
@@ -588,6 +726,10 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         result = await apiClient.createApplicationGitHub(args);
         break;
 
+      case 'list_env_variables':
+        result = await apiClient.listEnvVariables(args.app_uuid);
+        break;
+
       case 'create_env_variable':
         result = await apiClient.createEnvVariable(args.app_uuid, args.key, args.value, {
           is_buildtime: args.is_buildtime,
@@ -595,6 +737,21 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           is_preview: args.is_preview,
           is_literal: args.is_literal
         });
+        break;
+
+      case 'update_env_variable':
+        result = await apiClient.updateEnvVariable(args.app_uuid, args.env_uuid, {
+          key: args.key,
+          value: args.value,
+          is_buildtime: args.is_buildtime,
+          is_runtime: args.is_runtime,
+          is_preview: args.is_preview,
+          is_literal: args.is_literal
+        });
+        break;
+
+      case 'delete_env_variable':
+        result = await apiClient.deleteEnvVariable(args.app_uuid, args.env_uuid);
         break;
 
       case 'redeploy_application':
