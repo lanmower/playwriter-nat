@@ -1,307 +1,217 @@
-# vexify
+# Coolify MCP
 
-A pluggable Node.js vector database using SQLite with support for vLLM and Ollama embeddings, multi-format document processing, web crawling, and Google Drive sync.
+MCP server for Coolify CLI - list projects, resources, manage deployments, and configure environment variables.
 
 ## Features
 
-- 🚀 **Zero-config vector storage** using SQLite with sqlite-vec
-- 🤖 **vLLM & Ollama support** - Use vLLM (default) or Ollama for embeddings
-- 🔥 **vLLM embeddings** - Fast inference with models like BAAI/bge-base-en-v1.5 (default)
-- 📄 **Multi-format processing**: PDF, DOCX, HTML, JSON, CSV, XLSX
-- 🔍 **Semantic search** with cosine similarity
-- 💾 **Persistent storage** with better-sqlite3
-- 🌐 **Web crawler** with Playwright and text deduplication
-- ☁️ **Google Drive sync** with domain-wide delegation support
-- 🔁 **Incremental sync** - resume large syncs across multiple calls
-- 📦 **CommonJS** compatible for Node.js
-- 🔒 **Privacy-first** - all processing happens locally
-- 🔌 **MCP Server** - Integrates with Claude Code and other AI assistants
+- **Projects & Resources**: List projects and project resources
+- **App Logs**: Get runtime or deployment logs
+- **App Status**: Get status with optional deployment history
+- **GitHub Integration**: List GitHub apps and repositories
+- **Deployment**: Deploy from private GitHub repos, redeploy with options
+- **Environment Variables**: List, create, update, delete env variables for dev cycles
+- **Persistent Auth**: API token automatically saved to `~/.coolify-mcp/config.json`
 
 ## Installation
 
+### Add to Claude Code (Recommended)
+
 ```bash
-npm install vexify
+claude mcp add -s user coolify npx -y gxe@latest AnEntrypoint/coolify-mcp
+```
+
+### Direct Execution with gxe
+
+```bash
+npx -y gxe@latest AnEntrypoint/coolify-mcp
+```
+
+### Local Development
+
+```bash
+cd /home/user/coolify-mcp
+npm install
+node index.js
 ```
 
 ## Quick Start
 
-### Basic Vector Search
+1. **Get API token** from https://coolify.247420.xyz/security/api-tokens
+2. **Set the token** using the `set_api_token` tool once per session
+3. **Call any tool** to interact with Coolify
 
-```javascript
-const { VecStore, TransformerEmbedder } = require('vexify');
+## API Token Setup
 
-async function main() {
-  // Create embedder with local model
-  const embedder = await TransformerEmbedder.create('Xenova/bge-small-en-v1.5');
+To obtain an API token:
 
-  // Initialize vector store
-  const vecStore = new VecStore({
-    embedder,
-    dbName: './my-vectors.db'
-  });
+1. Navigate to https://coolify.247420.xyz/security/api-tokens
+2. Click the "Create" button
+3. Enter a description (e.g., "mcp-tool-token")
+4. Select permissions (recommend "root" for full access)
+5. Click "Create"
+6. **Copy the token immediately** (shown only once!)
 
-  await vecStore.initialize();
+The token is automatically saved to `~/.coolify-mcp/config.json` and persists between sessions.
 
-  // Add documents
-  await vecStore.addDocument('doc1', 'The quick brown fox jumps over the lazy dog');
-  await vecStore.addDocument('doc2', 'A fast auburn fox leaps above a sleepy canine');
+## Tools (12 total)
 
-  // Query
-  const results = await vecStore.query('jumping fox', 5);
-  console.log(results);
-}
-```
+### Project & Resource Management
 
-### PDF Search with Page Tracking
+#### list_projects
+List Coolify projects or get resources for a project.
 
-```javascript
-const {
-  VecStore,
-  TransformerEmbedder,
-  PDFEmbedder
-} = require('vexify');
+**Input:**
+- `project_id` (string, optional) - Get resources if set
 
-async function pdfSearch() {
-  const embedder = await TransformerEmbedder.create();
-  const vecStore = new VecStore({ embedder });
-  await vecStore.initialize();
+**Output:** Array of projects or project with applications
 
-  // Create PDF embedder
-  const pdfEmbedder = new PDFEmbedder(vecStore);
+### Logs & Status
 
-  // Embed entire PDF with page tracking
-  const result = await pdfEmbedder.embedPDF('./document.pdf', {
-    pdfName: 'my-document.pdf',
-    includePageMetadata: true
-  });
+#### get_app_logs
+Get app logs (runtime or deployment).
 
-  console.log(`Embedded ${result.embeddedPages} pages`);
+**Input:**
+- `app_uuid` (string, required) - Application UUID
+- `type` (string, optional, default: "runtime") - "runtime" or "deploy"
+- `lines` (number, optional, default: 100) - Log lines
 
-  // Query with page info
-  const results = await pdfEmbedder.queryWithPageInfo('search query', 5);
+**Output:** Log data
 
-  results.forEach(result => {
-    console.log(`Found in: ${result.pdfName}, Page ${result.pageNumber}`);
-    console.log(`Score: ${result.score}`);
-    console.log(`Text: ${result.text}`);
-  });
-}
-```
+#### get_app_status
+Get app status and deployment history.
 
-### Embed Specific Page Range
+**Input:**
+- `app_uuid` (string, required) - Application UUID
+- `include_deployments` (boolean, optional, default: false) - Include deployment history
+- `skip` (number, optional, default: 0) - Pagination skip
+- `take` (number, optional, default: 50) - Pagination take
 
-```javascript
-// Embed only pages 10-20
-const result = await pdfEmbedder.embedPDFPageRange(
-  './large-document.pdf',
-  10,
-  20,
-  { pdfName: 'large-document.pdf' }
-);
-```
+**Output:** App status with optional deployment history
 
-## CLI Usage
+### GitHub Deployment
 
-### Prerequisites
+#### list_github_apps
+List GitHub apps or get repositories from a GitHub app.
 
-**vLLM (default, recommended):**
-```bash
-# Install vLLM
-pip install vllm
+**Input:**
+- `github_app_id` (string, optional) - Get repos if set
 
-# Start vLLM server with embedding model
-python -m vllm.entrypoints.openai.api_server --model BAAI/bge-base-en-v1.5 --port 8000
-```
+**Output:** Array of GitHub apps or repositories
 
-**Ollama (alternative):**
-```bash
-# Install Ollama from https://ollama.ai
-ollama serve
+#### create_application_github
+Deploy app from private GitHub repo.
 
-# Pull embedding model
-ollama pull embeddinggemma
-```
+**Input:** (required)
+- `project_uuid`, `server_uuid`, `github_app_uuid`, `git_repository`, `git_branch`, `ports_exposes`
 
-### Quick Start
-```bash
-# Sync local folder (uses vLLM by default)
-npx vexify sync ./mydb.db ./documents
+**Optional:**
+- `name`, `description`, `build_pack`, `instant_deploy`, `base_directory`, `build_command`, `start_command`
 
-# Use Ollama instead
-npx vexify sync ./mydb.db ./documents --provider ollama
+**Output:** Created application object
 
-# Search
-npx vexify query ./mydb.db "your search" 10
+#### redeploy_application
+Redeploy application.
 
-# Crawl website
-npx vexify crawl https://docs.example.com --max-pages=100
+**Input:**
+- `app_uuid` (string, required) - Application UUID
+- `force` (boolean, optional) - Force rebuild
+- `instant_deploy` (boolean, optional) - Skip deployment queue
 
-# Google Drive sync with custom provider
-npx vexify gdrive ./mydb.db <folder-id> --service-account ./sa.json --impersonate admin@domain.com --provider vllm
-```
+**Output:** Deployment response
 
-### Provider Options
-```bash
-# Use vLLM (default)
-npx vexify <command> --provider vllm --host http://localhost:8000 --model BAAI/bge-base-en-v1.5
+### Environment Variables (CRUD)
 
-# Use Ollama
-npx vexify <command> --provider ollama --host http://localhost:11434 --model embeddinggemma
-```
+#### list_env_variables
+List app environment variables.
 
-### Incremental Google Drive Sync
-Process one file at a time, resume on next call:
-```bash
-npx vexify gdrive ./mydb.db root --service-account ./sa.json --impersonate admin@domain.com --incremental
-```
+**Input:**
+- `app_uuid` (string, required) - Application UUID
 
-See [docs/QUICK-START.md](./docs/QUICK-START.md) for complete examples.
+**Output:** Array of environment variables with UUIDs and settings
 
-## MCP Server Integration
+#### create_env_variable
+Add environment variable to app.
 
-Vexify includes an MCP (Model Context Protocol) server for AI agent integration. See [MCP_INTEGRATION.md](./MCP_INTEGRATION.md) for detailed setup instructions.
+**Input:** (required)
+- `app_uuid`, `key`, `value`
 
-### Quick MCP Setup
+**Optional:**
+- `is_buildtime` (boolean, default: true)
+- `is_runtime` (boolean, default: true)
+- `is_preview`, `is_literal`
 
-**For current directory:**
-```bash
-npx vexify mcp --directory . --db-path ./.vexify.db
-```
+**Output:** Created environment variable
 
-**Add to Claude Code with CLI (Recommended):**
-```bash
-# Add vexify for current directory (user scope - available everywhere)
-claude mcp add -s user vexify -- npx -y vexify@latest mcp --directory . --db-path ./.vexify.db
+#### update_env_variable
+Edit app environment variable.
 
-# Add vexify for specific project
-claude mcp add -s user vexify-project -- npx -y vexify@latest mcp --directory /path/to/your/project --db-path /path/to/your/project/.vexify.db
-```
+**Input:** (required)
+- `app_uuid`, `env_uuid`
 
-**Or create config manually:**
-```bash
-mkdir -p ~/.claude && cat > ~/.claude/claude_desktop.json << 'EOF'
+**Optional:**
+- `key`, `value`, `is_buildtime`, `is_runtime`, `is_preview`, `is_literal`
+
+**Output:** Updated environment variable
+
+#### delete_env_variable
+Delete app environment variable.
+
+**Input:** (required)
+- `app_uuid`, `env_uuid`
+
+**Output:** Success confirmation
+
+### Authentication
+
+#### set_api_token
+Set Coolify API token for authentication.
+
+**Input:**
+- `token` (string, required) - Your API token from Coolify
+
+**Output:**
+```json
 {
-  "mcpServers": {
-    "vexify": {
-      "command": "npx",
-      "args": ["vexify@latest", "mcp", "--directory", ".", "--db-path", "./.vexify.db"]
-    }
-  }
+  "success": true,
+  "message": "API token saved successfully"
 }
-EOF
 ```
 
-3. **Restart Claude Code** and start searching:
-```
-"Find authentication functions in the codebase"
-"Search for database connection logic"
-```
+## Configuration
 
-## Documentation
+Configuration is stored at `~/.coolify-mcp/config.json`:
 
-- **[MCP Integration Guide](./MCP_INTEGRATION.md)** - Claude Code & AI assistant setup
-- **[Quick Start Guide](./docs/QUICK-START.md)** - Get started in 5 minutes
-- **[Google Drive Setup](./docs/GDRIVE-SETUP.md)** - Complete auth setup guide
-- **[Performance Audit](./docs/PERFORMANCE_AUDIT.md)** - GPU optimization
-- **[Changelog](./docs/CHANGELOG.md)** - Recent updates
-
-## API Reference
-
-### VecStore
-
-```javascript
-const vecStore = new VecStore({
-  embedder,           // Required: Embedder instance
-  store,              // Optional: Custom storage adapter
-  search,             // Optional: Custom search algorithm
-  dbName,             // Optional: Database path (default: './vecstore.db')
-  storeContent        // Optional: Store original content (default: true)
-});
-
-await vecStore.initialize();
-await vecStore.addDocument(id, content, metadata);
-const results = await vecStore.query(query, topK);
-```
-
-### PDFReader
-
-```javascript
-const { PDFReader } = require('vexify');
-
-const reader = new PDFReader();
-await reader.load('./document.pdf');
-
-const pageCount = reader.getPageCount();
-const page = await reader.extractPage(1);
-const allPages = await reader.extractAllPages();
-const markdown = await reader.toMarkdown();
-```
-
-### PDFEmbedder
-
-```javascript
-const pdfEmbedder = new PDFEmbedder(vecStore);
-
-// Embed full PDF
-await pdfEmbedder.embedPDF(pdfPath, options);
-
-// Embed from buffer
-await pdfEmbedder.embedPDFFromBuffer(buffer, pdfName, options);
-
-// Embed page range
-await pdfEmbedder.embedPDFPageRange(pdfPath, startPage, endPage, options);
-
-// Query with page info
-const results = await pdfEmbedder.queryWithPageInfo(query, topK);
-```
-
-### TransformerEmbedder
-
-```javascript
-// Create embedder with default model
-const embedder = await TransformerEmbedder.create();
-
-// Or specify a model
-const embedder = await TransformerEmbedder.create('Xenova/bge-small-en-v1.5');
-
-// Embed text
-const vector = await embedder.embed('some text');
-```
-
-## Document Structure
-
-Documents stored with metadata include:
-
-```javascript
+```json
 {
-  id: 'document.pdf:page:5',
-  vector: [0.123, -0.456, ...],
-  content: 'Page text content...',
-  metadata: {
-    source: 'pdf',
-    pdfName: 'document.pdf',
-    pageNumber: 5,
-    totalPages: 100,
-    pageMetadata: {
-      width: 612,
-      height: 792
-    }
-  },
-  score: 0.87  // Added during search
+  "apiToken": "3|your-token-here"
 }
 ```
 
-## Dependencies
+The token is automatically saved via the `set_api_token` tool and persists across sessions.
 
-- `better-sqlite3` - Fast SQLite database
-- `sqlite-vec` - Vector extension for SQLite
-- `@xenova/transformers` - Local transformer models
-- `unpdf` - PDF text extraction
+## Dev Cycle Workflow Example
+
+```
+1. list_env_variables          → See current configuration
+2. update_env_variable         → Adjust settings (build, runtime, etc)
+3. redeploy_application        → Test changes (force rebuild)
+4. get_app_logs type=deploy    → Check deployment status
+5. get_app_status              → Verify app health
+```
+
+## Security
+
+- **Token Storage**: Stored locally in `~/.coolify-mcp/config.json`
+- **No Logging**: Tokens never logged except to Coolify server
+- **Token Rotation**: Regularly rotate tokens at https://coolify.247420.xyz/security/api-tokens
+
+## Architecture
+
+- Uses `@modelcontextprotocol/sdk` for MCP protocol
+- Communicates via stdio (stdin/stdout)
+- Compatible with any MCP client (Claude Code, etc)
+- No external dependencies beyond npm packages
 
 ## License
 
 MIT
-
-## Author
-
-Steve Aldrin
