@@ -90,35 +90,26 @@ class CoolifyAPIClient {
     });
   }
 
-  async listProjects() {
+  async listProjects(projectId = null) {
     if (!this.apiToken) {
       throw new Error('API token not set. Use set_api_token tool first.');
     }
 
-    const response = await this.makeRequest('GET', '/api/v1/projects');
-
-    if (response.status === 401) {
-      throw new Error('Unauthorized: Invalid API token');
-    }
-
-    if (response.status !== 200) {
-      throw new Error(`API error: ${response.status} - ${response.text}`);
-    }
-
-    return response.body || [];
-  }
-
-  async listResources(projectId) {
-    if (!this.apiToken) {
-      throw new Error('API token not set. Use set_api_token tool first.');
+    if (!projectId) {
+      const response = await this.makeRequest('GET', '/api/v1/projects');
+      if (response.status === 401) {
+        throw new Error('Unauthorized: Invalid API token');
+      }
+      if (response.status !== 200) {
+        throw new Error(`API error: ${response.status} - ${response.text}`);
+      }
+      return response.body || [];
     }
 
     const projectResponse = await this.makeRequest('GET', `/api/v1/projects/${projectId}`);
-
     if (projectResponse.status === 401) {
       throw new Error('Unauthorized: Invalid API token');
     }
-
     if (projectResponse.status !== 200) {
       throw new Error(`API error: ${projectResponse.status} - ${projectResponse.text}`);
     }
@@ -139,12 +130,16 @@ class CoolifyAPIClient {
     return resources;
   }
 
-  async getAppLogs(appUuid, lines = 100) {
+  async getAppLogs(appUuid, lines = 100, type = 'runtime') {
     if (!this.apiToken) {
       throw new Error('API token not set. Use set_api_token tool first.');
     }
 
-    const response = await this.makeRequest('GET', `/api/v1/applications/${appUuid}/logs?lines=${lines}`);
+    const endpoint = type === 'deploy' ?
+      `/api/v1/applications/${appUuid}/deploy-logs?lines=${lines}` :
+      `/api/v1/applications/${appUuid}/logs?lines=${lines}`;
+
+    const response = await this.makeRequest('GET', endpoint);
 
     if (response.status === 401) {
       throw new Error('Unauthorized: Invalid API token');
@@ -157,43 +152,7 @@ class CoolifyAPIClient {
     return response.body || [];
   }
 
-  async getDeployLogs(appUuid, lines = 100) {
-    if (!this.apiToken) {
-      throw new Error('API token not set. Use set_api_token tool first.');
-    }
-
-    const response = await this.makeRequest('GET', `/api/v1/applications/${appUuid}/deploy-logs?lines=${lines}`);
-
-    if (response.status === 401) {
-      throw new Error('Unauthorized: Invalid API token');
-    }
-
-    if (response.status !== 200) {
-      throw new Error(`API error: ${response.status} - ${response.text}`);
-    }
-
-    return response.body || [];
-  }
-
-  async getDeployments(appUuid, skip = 0, take = 50) {
-    if (!this.apiToken) {
-      throw new Error('API token not set. Use set_api_token tool first.');
-    }
-
-    const response = await this.makeRequest('GET', `/api/v1/deployments/applications/${appUuid}?skip=${skip}&take=${take}`);
-
-    if (response.status === 401) {
-      throw new Error('Unauthorized: Invalid API token');
-    }
-
-    if (response.status !== 200) {
-      throw new Error(`API error: ${response.status} - ${response.text}`);
-    }
-
-    return response.body || { count: 0, deployments: [] };
-  }
-
-  async getAppStatus(appUuid) {
+  async getAppStatus(appUuid, includeDeployments = false, skip = 0, take = 50) {
     if (!this.apiToken) {
       throw new Error('API token not set. Use set_api_token tool first.');
     }
@@ -209,7 +168,7 @@ class CoolifyAPIClient {
     }
 
     const app = response.body;
-    return {
+    const result = {
       uuid: app.uuid,
       name: app.name,
       description: app.description,
@@ -222,41 +181,40 @@ class CoolifyAPIClient {
       created_at: app.created_at,
       updated_at: app.updated_at
     };
+
+    if (includeDeployments) {
+      const deploysResponse = await this.makeRequest('GET', `/api/v1/deployments/applications/${appUuid}?skip=${skip}&take=${take}`);
+      if (deploysResponse.status === 200) {
+        result.deployments = deploysResponse.body || { count: 0, deployments: [] };
+      }
+    }
+
+    return result;
   }
 
-  async listGitHubApps() {
+  async listGitHubApps(gitHubAppId = null) {
     if (!this.apiToken) {
       throw new Error('API token not set. Use set_api_token tool first.');
     }
 
-    const response = await this.makeRequest('GET', '/api/v1/github-apps');
+    if (!gitHubAppId) {
+      const response = await this.makeRequest('GET', '/api/v1/github-apps');
+      if (response.status === 401) {
+        throw new Error('Unauthorized: Invalid API token');
+      }
+      if (response.status !== 200) {
+        throw new Error(`API error: ${response.status} - ${response.text}`);
+      }
+      return response.body || [];
+    }
 
+    const response = await this.makeRequest('GET', `/api/v1/github-apps/${gitHubAppId}/repositories`);
     if (response.status === 401) {
       throw new Error('Unauthorized: Invalid API token');
     }
-
     if (response.status !== 200) {
       throw new Error(`API error: ${response.status} - ${response.text}`);
     }
-
-    return response.body || [];
-  }
-
-  async getGitHubRepositories(gitHubAppUuid) {
-    if (!this.apiToken) {
-      throw new Error('API token not set. Use set_api_token tool first.');
-    }
-
-    const response = await this.makeRequest('GET', `/api/v1/github-apps/${gitHubAppUuid}/repositories`);
-
-    if (response.status === 401) {
-      throw new Error('Unauthorized: Invalid API token');
-    }
-
-    if (response.status !== 200) {
-      throw new Error(`API error: ${response.status} - ${response.text}`);
-    }
-
     return response.body?.repositories || [];
   }
 
@@ -374,30 +332,21 @@ const server = new Server(
 const tools = [
   {
     name: 'list_projects',
-    description: 'List Coolify projects',
-    inputSchema: {
-      type: 'object',
-      properties: {},
-      required: []
-    }
-  },
-  {
-    name: 'list_resources',
-    description: 'List project resources (apps, databases, services)',
+    description: 'List projects or project resources',
     inputSchema: {
       type: 'object',
       properties: {
         project_id: {
           type: 'string',
-          description: 'Project UUID'
+          description: 'Project UUID (get resources if set)'
         }
       },
-      required: ['project_id']
+      required: []
     }
   },
   {
     name: 'get_app_logs',
-    description: 'Get app runtime logs',
+    description: 'Get app logs (runtime or deployment)',
     inputSchema: {
       type: 'object',
       properties: {
@@ -405,9 +354,14 @@ const tools = [
           type: 'string',
           description: 'App UUID'
         },
+        type: {
+          type: 'string',
+          description: 'Log type: runtime or deploy',
+          default: 'runtime'
+        },
         lines: {
           type: 'number',
-          description: 'Log lines (default: 100)',
+          description: 'Log lines',
           default: 100
         }
       },
@@ -415,8 +369,8 @@ const tools = [
     }
   },
   {
-    name: 'get_deploy_logs',
-    description: 'Get deployment logs',
+    name: 'get_app_status',
+    description: 'Get app status and deployment history',
     inputSchema: {
       type: 'object',
       properties: {
@@ -424,24 +378,10 @@ const tools = [
           type: 'string',
           description: 'App UUID'
         },
-        lines: {
-          type: 'number',
-          description: 'Log lines (default: 100)',
-          default: 100
-        }
-      },
-      required: ['app_uuid']
-    }
-  },
-  {
-    name: 'get_deployments',
-    description: 'List app deployments with status and commit',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        app_uuid: {
-          type: 'string',
-          description: 'App UUID'
+        include_deployments: {
+          type: 'boolean',
+          description: 'Include deployment history',
+          default: false
         },
         skip: {
           type: 'number',
@@ -458,40 +398,17 @@ const tools = [
     }
   },
   {
-    name: 'get_app_status',
-    description: 'Get app status and health',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        app_uuid: {
-          type: 'string',
-          description: 'App UUID'
-        }
-      },
-      required: ['app_uuid']
-    }
-  },
-  {
     name: 'list_github_apps',
-    description: 'List installed GitHub apps',
-    inputSchema: {
-      type: 'object',
-      properties: {},
-      required: []
-    }
-  },
-  {
-    name: 'get_github_repositories',
-    description: 'List repos from GitHub app',
+    description: 'List GitHub apps or app repositories',
     inputSchema: {
       type: 'object',
       properties: {
-        github_app_uuid: {
+        github_app_id: {
           type: 'string',
-          description: 'GitHub app UUID'
+          description: 'GitHub app ID (get repos if set)'
         }
       },
-      required: ['github_app_uuid']
+      required: []
     }
   },
   {
@@ -652,35 +569,19 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
     switch (name) {
       case 'list_projects':
-        result = await apiClient.listProjects();
-        break;
-
-      case 'list_resources':
-        result = await apiClient.listResources(args.project_id);
+        result = await apiClient.listProjects(args.project_id || null);
         break;
 
       case 'get_app_logs':
-        result = await apiClient.getAppLogs(args.app_uuid, args.lines || 100);
-        break;
-
-      case 'get_deploy_logs':
-        result = await apiClient.getDeployLogs(args.app_uuid, args.lines || 100);
-        break;
-
-      case 'get_deployments':
-        result = await apiClient.getDeployments(args.app_uuid, args.skip || 0, args.take || 50);
+        result = await apiClient.getAppLogs(args.app_uuid, args.lines || 100, args.type || 'runtime');
         break;
 
       case 'get_app_status':
-        result = await apiClient.getAppStatus(args.app_uuid);
+        result = await apiClient.getAppStatus(args.app_uuid, args.include_deployments || false, args.skip || 0, args.take || 50);
         break;
 
       case 'list_github_apps':
-        result = await apiClient.listGitHubApps();
-        break;
-
-      case 'get_github_repositories':
-        result = await apiClient.getGitHubRepositories(args.github_app_uuid);
+        result = await apiClient.listGitHubApps(args.github_app_id || null);
         break;
 
       case 'create_application_github':
