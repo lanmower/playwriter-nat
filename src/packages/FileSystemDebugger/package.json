@@ -1,0 +1,11 @@
+{
+  "name": "@sequential-desktop/debugger",
+  "version": "1.0.0",
+  "description": "Filesystem Debugger for Sequential-OS",
+  "main": "index.js",
+  "scripts": {},
+  "keywords": ["osjs", "sequential", "debugger", "filesystem"],
+  "dependencies": {
+    "hyperapp": "^1.2.10"
+  }
+}

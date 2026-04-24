@@ -1,0 +1,10 @@
+{
+  "name": "SequentialTerminal",
+  "category": "development",
+  "icon": "utilities-terminal",
+  "title": "Sequential-OS Terminal",
+  "description": "Content-addressable filesystem terminal with layer management",
+  "server": "websocket",
+  "singular": false,
+  "autostart": false
+}
