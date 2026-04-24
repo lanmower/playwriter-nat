@@ -1,0 +1,10 @@
+{
+  "name": "FileSystemDebugger",
+  "category": "development",
+  "icon": "applications-system",
+  "title": "Filesystem Debugger",
+  "description": "Comprehensive filesystem browser with Sequential-OS layer inspection",
+  "server": "websocket",
+  "singular": true,
+  "autostart": false
+}

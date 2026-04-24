@@ -1,0 +1,40 @@
+{
+  "name": "playwriter-reflector",
+  "version": "1.0.0",
+  "description": "Playwriter remote reflector server for Coolify deployment with subdomain routing",
+  "type": "module",
+  "main": "dist/index.js",
+  "bin": {
+    "reflector": "./bin.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsx src/index.ts",
+    "start": "node dist/index.js",
+    "watch": "tsc -w",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@hono/node-server": "^1.19.6",
+    "@hono/node-ws": "^1.2.0",
+    "chalk": "^5.6.2",
+    "hono": "^4.10.6",
+    "ws": "^8.18.3",
+    "zod": "^3"
+  },
+  "devDependencies": {
+    "@types/node": "^24.10.1",
+    "@types/ws": "^8.18.1",
+    "tsx": "^4.20.6",
+    "typescript": "^5.9.3"
+  },
+  "keywords": [
+    "playwriter",
+    "reflector",
+    "remote",
+    "coolify",
+    "subdomain"
+  ],
+  "author": "Playwriter Contributors",
+  "license": "MIT"
+}

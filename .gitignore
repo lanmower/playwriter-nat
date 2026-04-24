@@ -1,0 +1,68 @@
+# Dependencies
+node_modules/
+
+# Build outputs
+dist/
+build/
+
+# Package files
+package-lock.json
+
+# Cache
+.cache/
+
+# Database files
+*.db
+*.db-*
+*.db-journal
+*.db-shm
+*.db-wal
+
+# Google Drive sync state
+.gdrive-sync-state.json
+.gdrive-token.json
+
+# Service account and keys
+**/service-account*.json
+**/*-key.json
+
+# Environment files
+
+# Test crawl outputs
+test-crawl/
+test-fresh-crawl/
+test-real-crawl/
+test-research/
+
+# Test outputs
+eval/*.json
+
+# Temporary files
+*.tmp
+*.log
+
+# IDE and OS files
+.DS_Store
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+Thumbs.db
+
+# Tool metadata
+glootie/
+.glootie*/
+
+# Backup files
+backup/
+*.bak
+
+# Vexify ignore file
+.vexifyignore
+
+# Removed files
+IMPLEMENTATION_SUMMARY.md
+glootie/.caveats.txt
+glootie/.mcp-file-analysis-metadata.json
+config.bat

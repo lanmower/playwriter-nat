@@ -1,0 +1,11 @@
+{
+  "name": "@sequential-desktop/terminal",
+  "version": "1.0.0",
+  "description": "Sequential-OS Terminal application for OS.js",
+  "main": "index.js",
+  "scripts": {},
+  "keywords": ["osjs", "sequential", "terminal"],
+  "dependencies": {
+    "hyperapp": "^1.2.10"
+  }
+}
